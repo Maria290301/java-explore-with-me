@@ -23,7 +23,7 @@ services:
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
       - SPRING_JPA_SHOW_SQL=true
 
-  ewm-api:
+  ewm-service:
     build: ./ewm-service
     image: ewm-service
     ports:
