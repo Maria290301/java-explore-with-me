@@ -1,4 +1,14 @@
 services:
+  stats-db:
+    image: postgres:16.1
+    container_name: stats-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=stat_db
+      - POSTGRES_USER=dbuser
+      - POSTGRES_PASSWORD=12345
+
   stats-server:
     build: ./ewm-stats-service/ewm-stats-service
     image: stat-server
@@ -10,13 +20,15 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://stats-db:5432/stat_db
       - SPRING_DATASOURCE_USERNAME=dbuser
       - SPRING_DATASOURCE_PASSWORD=12345
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_SHOW_SQL=true
 
-  stats-db:
-    image: postgres:16.1
-    container_name: stats-db
+  ewm-api:
+    build: ./ewm-api
+    image: ewm-api
     ports:
-      - "5432:5432"
+      - "8080:8080"
+    depends_on:
+      - stats-server
     environment:
-      - POSTGRES_DB=stat_db
-      - POSTGRES_USER=dbuser
-      - POSTGRES_PASSWORD=12345
+      - STAT_SERVER_URL=http://stat-server:9090
