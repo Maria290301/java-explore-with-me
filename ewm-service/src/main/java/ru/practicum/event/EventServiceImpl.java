@@ -52,7 +52,7 @@ public class EventServiceImpl implements EventService {
     @Override
     public EventDto getEventById(Long id) {
         Event event = eventRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Event not found with id = " + id));
+                .orElseThrow(() -> new NotFoundException("Event not found with id = " + id));
         EventDto dto = eventMapper.toDto(event);
 
         int confirmedRequests = participationRequestRepository.countByEventIdAndStatus(event.getId(), RequestStatus.CONFIRMED);
