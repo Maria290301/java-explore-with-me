@@ -1,16 +1,4 @@
 services:
-  stats-server:
-    build: ./ewm-stats-service/ewm-stats-service
-    image: stat-server
-    ports:
-      - "9090:9090"
-    depends_on:
-      - stats-db
-    environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://stats-db:5432/stat_db
-      - SPRING_DATASOURCE_USERNAME=dbuser
-      - SPRING_DATASOURCE_PASSWORD=12345
-
   stats-db:
     image: postgres:16.1
     container_name: stats-db
@@ -20,3 +8,34 @@ services:
       - POSTGRES_DB=stat_db
       - POSTGRES_USER=dbuser
       - POSTGRES_PASSWORD=12345
+
+  stats-server:
+    build: ./stats-server/ewm-stats-service
+    image: stats-server
+    ports:
+      - "9090:9090"
+    depends_on:
+      - stats-db
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://stats-db:5432/stat_db
+      - SPRING_DATASOURCE_USERNAME=dbuser
+      - SPRING_DATASOURCE_PASSWORD=12345
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_SHOW_SQL=true
+
+  ewm-service:
+    build: ./ewm-service
+    image: ewm-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      - stats-server
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://stats-db:5432/stat_db
+      - SPRING_DATASOURCE_USERNAME=dbuser
+      - SPRING_DATASOURCE_PASSWORD=12345
+      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=none
+      - SPRING_SQL_INIT_MODE=always
+      - SPRING_SQL_INIT_SCHEMA_LOCATIONS=classpath:schema.sql
