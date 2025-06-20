@@ -9,7 +9,7 @@
         <version>0.0.1-SNAPSHOT</version>
     </parent>
 
-    <artifactId>ewm-api</artifactId>
+    <artifactId>ewm-service</artifactId>
     <packaging>jar</packaging>
 
     <properties>
