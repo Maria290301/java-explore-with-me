@@ -4,6 +4,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import ru.practicum.HitRequestDto;
+import ru.practicum.StatsClient;
 import ru.practicum.event.dto.*;
 import ru.practicum.exception.NotFoundException;
 import ru.practicum.request.ParticipationRequestRepository;
@@ -12,6 +14,7 @@ import ru.practicum.user.User;
 import ru.practicum.user.UserRepository;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -26,14 +29,16 @@ public class EventServiceImpl implements EventService {
     private final EventMapper eventMapper;
     private final ViewTracker viewTracker;
     private final ParticipationRequestRepository participationRequestRepository;
+    private final StatsClient statsClient;
 
 
-    public EventServiceImpl(EventRepository eventRepository, UserRepository userRepository, EventMapper eventMapper, ViewTracker viewTracker, ParticipationRequestRepository participationRequestRepository) {
+    public EventServiceImpl(EventRepository eventRepository, UserRepository userRepository, EventMapper eventMapper, ViewTracker viewTracker, ParticipationRequestRepository participationRequestRepository, StatsClient statsClient) {
         this.eventRepository = eventRepository;
         this.userRepository = userRepository;
         this.eventMapper = eventMapper;
         this.viewTracker = viewTracker;
         this.participationRequestRepository = participationRequestRepository;
+        this.statsClient = statsClient;
     }
 
     @Override
@@ -130,9 +135,16 @@ public class EventServiceImpl implements EventService {
             throw new NotFoundException("Event not found");
         }
 
-        viewTracker.isUniqueView(eventId, ip);
+        HitRequestDto hitDto = new HitRequestDto();
+        hitDto.setApp("main-service");
+        hitDto.setUri("/events/" + eventId);
+        hitDto.setIp(ip);
+        hitDto.setTimestamp(LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));  // динамическое время
+
+        statsClient.recordHit(hitDto);
 
         EventDto dto = eventMapper.toDto(event);
+
         dto.setViews(viewTracker.getViewCount(eventId));
 
         int confirmedRequests = participationRequestRepository.countByEventIdAndStatus(eventId, RequestStatus.CONFIRMED);
