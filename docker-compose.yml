@@ -1,42 +1,55 @@
-services:
-  stats-db:
-    image: postgres:16.1
-    container_name: stats-db
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_DB=stat_db
-      - POSTGRES_USER=dbuser
-      - POSTGRES_PASSWORD=12345
 
-  stats-server:
-    build: ./stats-server/ewm-stats-service
-    image: stats-server
+services:
+  stat-server:
+    build:
+      context: ./stat-service/server
+      dockerfile: Dockerfile
+    image: stat-service
+    container_name: server
     ports:
       - "9090:9090"
     depends_on:
-      - stats-db
+      - statdb
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://stats-db:5432/stat_db
-      - SPRING_DATASOURCE_USERNAME=dbuser
-      - SPRING_DATASOURCE_PASSWORD=12345
-      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
-      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
-      - SPRING_JPA_SHOW_SQL=true
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://statdb:5432/statdb
+      - SPRING_DATASOURCE_USERNAME=ewm
+      - SPRING_DATASOURCE_PASSWORD=ewm
+      - JAVA_OPTS=-Djdk.httpclient.HttpClient.log=errors,requests
 
-  ewm-service:
-    build: ./ewm-service
-    image: ewm-service
+  statdb:
+    image: postgres:14-alpine
+    volumes:
+      - ./pgdata/statdb:/var/lib/postgresql/data
+    container_name: statdb
+    environment:
+      - POSTGRES_DB=statdb
+      - POSTGRES_USER=ewm
+      - POSTGRES_PASSWORD=ewm
+
+  main-service:
+    build:
+      context: ./main-service
+      dockerfile: Dockerfile
+    image: main-service
+    container_name: main-service
     ports:
       - "8080:8080"
     depends_on:
-      - stats-server
+      - ewmdb
+      - stat-server
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://stats-db:5432/stat_db
-      - SPRING_DATASOURCE_USERNAME=dbuser
-      - SPRING_DATASOURCE_PASSWORD=12345
-      - SPRING_DATASOURCE_DRIVER_CLASS_NAME=org.postgresql.Driver
-      - SPRING_JPA_HIBERNATE_DDL_AUTO=none
-      - SPRING_SQL_INIT_MODE=always
-      - SPRING_SQL_INIT_SCHEMA_LOCATIONS=classpath:schema.sql
-      - STATS_SERVER_URL=http://stats-server:9090
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://ewmdb:5432/ewmdb
+      - SPRING_DATASOURCE_USERNAME=ewm
+      - SPRING_DATASOURCE_PASSWORD=ewm
+      - SERVICES_STATSSERVICE_URI=http://stat-server:9090
+    #   - JAVA_OPTS=-Djdk.httpclient.HttpClient.log=errors,requests
+
+  ewmdb:
+    image: postgres:14-alpine
+    volumes:
+      - ./pgdata/ewmdb:/var/lib/postgresql/data
+    container_name: ewmdb
+    environment:
+      - POSTGRES_DB=ewmdb
+      - POSTGRES_USER=ewm
+      - POSTGRES_PASSWORD=ewm
