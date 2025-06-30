@@ -1,49 +1,54 @@
+
+
 services:
+  stats-db:
+    image: postgres:14-alpine
+    container_name: postgres-ewm-stats-db
+    environment:
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_USER=root
+      - POSTGRES_DB=ewm-stats
+    ports:
+      - "5434:5432"  # Чтобы можно было подключаться с локальной машины на порт 5434
+
   stats-server:
-    build:
-      context: ./stats-server/server
-      dockerfile: Dockerfile
-    image: stats-server
-    container_name: stats-server
+    build: stats-server/server
+    image: ewm-stats-server
+    container_name: ewm-stats-server
     ports:
       - "9090:9090"
     depends_on:
-      - statdb
+      - stats-db
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://statdb:5432/statdb
-      - SPRING_DATASOURCE_USERNAME=ewm
-      - SPRING_DATASOURCE_PASSWORD=ewm
-      - JAVA_OPTS=-Djdk.httpclient.HttpClient.log=errors,requests
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://stats-db:5432/ewm-stats
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SERVER_PORT=9090
 
-  statdb:
+  ewm-db:
     image: postgres:14-alpine
-    container_name: statdb
+    container_name: postgres-ewm-main-db
     environment:
-      - POSTGRES_DB=statdb
-      - POSTGRES_USER=ewm
-      - POSTGRES_PASSWORD=ewm
+      - POSTGRES_PASSWORD=root
+      - POSTGRES_USER=root
+      - POSTGRES_DB=ewm
+    ports:
+      - "5433:5432"  # Проброс порта для локального доступа на 5433
 
   ewm-service:
-    build:
-      context: ./ewm-service
-      dockerfile: Dockerfile
+    build: ewm-service
     image: ewm-service
     container_name: ewm-service
     ports:
       - "8080:8080"
     depends_on:
-      - ewmdb
+      - ewm-db
       - stats-server
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://ewmdb:5432/ewmdb
-      - SPRING_DATASOURCE_USERNAME=ewm
-      - SPRING_DATASOURCE_PASSWORD=ewm
-      - stat-server.url=http://stats-server:9090
-
-  ewmdb:
-    image: postgres:14-alpine
-    container_name: ewmdb
-    environment:
-      - POSTGRES_DB=ewmdb
-      - POSTGRES_USER=ewm
-      - POSTGRES_PASSWORD=ewm
+      - SPRING_APPLICATION_NAME=ewm-service
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://ewm-db:5432/ewm
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - SERVICES_STATS_SERVICE_URI=http://stats-server:9090
+      - SERVER_PORT=8080
+      - JAVA_OPTS=-Djdk.httpclient.HttpClient.log=errors,requests

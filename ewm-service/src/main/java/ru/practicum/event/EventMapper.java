@@ -42,6 +42,8 @@ public class EventMapper {
                 .requestModeration(event.isRequestModeration())
                 .state(event.getEventStatus())
                 .title(event.getTitle())
+                .confirmedRequests(0)  // временное значение, перезапишется позже
+                .views(0L)             // тоже будет перезаписано, если используется StatsClient
                 .build();
     }
 

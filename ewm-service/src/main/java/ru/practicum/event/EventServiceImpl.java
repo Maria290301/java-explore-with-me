@@ -1,6 +1,5 @@
 package ru.practicum.event;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -11,11 +10,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import ru.practicum.EndpointHit;
 import ru.practicum.StatsClient;
 import ru.practicum.ViewStats;
+import ru.practicum.ViewsStatsRequest;
 import ru.practicum.category.Category;
 import ru.practicum.category.CategoryRepository;
 import ru.practicum.event.dto.*;
@@ -86,19 +85,27 @@ public class EventServiceImpl implements EventService {
             specification = specification.and((root, query, criteriaBuilder) ->
                     criteriaBuilder.greaterThanOrEqualTo(root.get("eventDate"), rangeStart));
         }
+
         Page<Event> events = eventRepository.findAll(specification, pageable);
+        List<Event> eventList = events.getContent();
 
-        List<EventFullDto> result = events.getContent()
-                .stream().map(EventMapper::toEventFullDto).collect(Collectors.toList());
+        // 🛡 гарантируем, что будет хотя бы пустой список
+        if (eventList == null || eventList.isEmpty()) {
+            return List.of();
+        }
 
-        Map<Long, List<Request>> confirmedRequestsCountMap = getConfirmedRequestsCount(events.toList());
+        List<EventFullDto> result = eventList.stream()
+                .map(EventMapper::toEventFullDto)
+                .collect(Collectors.toList());
+
+        Map<Long, List<Request>> confirmedRequestsCountMap = getConfirmedRequestsCount(eventList);
         for (EventFullDto event : result) {
             List<Request> requests = confirmedRequestsCountMap.getOrDefault(event.getId(), List.of());
             event.setConfirmedRequests(requests.size());
         }
+
         return result;
     }
-
 
     @Override
     public EventFullDto updateEventFromAdmin(Long eventId, UpdateEventAdminRequest updateEvent) {
@@ -402,20 +409,23 @@ public class EventServiceImpl implements EventService {
                 .map(event -> String.format("/events/%s", event.getId()))
                 .collect(Collectors.toList());
 
-        List<LocalDateTime> startDates = events.stream()
+        LocalDateTime earliestDate = events.stream()
                 .map(Event::getCreatedDate)
-                .collect(Collectors.toList());
-        LocalDateTime earliestDate = startDates.stream()
                 .min(LocalDateTime::compareTo)
                 .orElse(null);
+
         Map<Long, Long> viewStatsMap = new HashMap<>();
 
         if (earliestDate != null) {
-            ResponseEntity<Object> response = statsClient.getStats(earliestDate, LocalDateTime.now(),
-                    uris, true);
+            ViewsStatsRequest request = ViewsStatsRequest.builder()
+                    .start(earliestDate)
+                    .end(LocalDateTime.now())
+                    .uris(uris)
+                    .unique(true)
+                    .application(applicationName)
+                    .build();
 
-            List<ViewStats> viewStatsList = objectMapper.convertValue(response.getBody(), new TypeReference<>() {
-            });
+            List<ViewStats> viewStatsList = statsClient.getStats(request);
 
             viewStatsMap = viewStatsList.stream()
                     .filter(statsDto -> statsDto.getUri().startsWith("/events/"))
@@ -424,6 +434,7 @@ public class EventServiceImpl implements EventService {
                             ViewStats::getHits
                     ));
         }
+
         return viewStatsMap;
     }
 
