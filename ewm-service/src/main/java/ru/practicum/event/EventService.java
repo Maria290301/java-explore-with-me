@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface EventService {
 
-    List<EventFullDto> getAllEventFromAdmin(SearchEventParamsAdmin searchEventParamsAdmin);
+    List<EventFullDtoForAdmin> getAllEventFromAdmin(SearchEventParamsAdmin searchEventParamsAdmin);
 
     EventFullDto updateEventFromAdmin(Long eventId, UpdateEventAdminRequest inputUpdate);
 

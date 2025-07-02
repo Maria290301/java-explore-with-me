@@ -54,57 +54,74 @@ public class EventServiceImpl implements EventService {
 
 
     @Override
-    public List<EventFullDto> getAllEventFromAdmin(SearchEventParamsAdmin searchEventParamsAdmin) {
+    public List<EventFullDtoForAdmin> getAllEventFromAdmin(SearchEventParamsAdmin searchEventParamsAdmin) {
         PageRequest pageable = PageRequest.of(searchEventParamsAdmin.getFrom() / searchEventParamsAdmin.getSize(),
                 searchEventParamsAdmin.getSize());
         Specification<Event> specification = Specification.where(null);
 
-        List<Long> users = searchEventParamsAdmin.getUsers();
-        List<String> states = searchEventParamsAdmin.getStates();
-        List<Long> categories = searchEventParamsAdmin.getCategories();
-        LocalDateTime rangeEnd = searchEventParamsAdmin.getRangeEnd();
-        LocalDateTime rangeStart = searchEventParamsAdmin.getRangeStart();
-
-        if (users != null && !users.isEmpty()) {
-            specification = specification.and((root, query, criteriaBuilder) ->
-                    root.get("initiator").get("id").in(users));
+        if (searchEventParamsAdmin.getUsers() != null && !searchEventParamsAdmin.getUsers().isEmpty()) {
+            specification = specification.and((root, query, cb) ->
+                    root.get("initiator").get("id").in(searchEventParamsAdmin.getUsers()));
         }
-        if (states != null && !states.isEmpty()) {
-            specification = specification.and((root, query, criteriaBuilder) ->
-                    root.get("eventStatus").as(String.class).in(states));
+        if (searchEventParamsAdmin.getStates() != null && !searchEventParamsAdmin.getStates().isEmpty()) {
+            specification = specification.and((root, query, cb) ->
+                    root.get("eventStatus").as(String.class).in(searchEventParamsAdmin.getStates()));
         }
-        if (categories != null && !categories.isEmpty()) {
-            specification = specification.and((root, query, criteriaBuilder) ->
-                    root.get("category").get("id").in(categories));
+        if (searchEventParamsAdmin.getCategories() != null && !searchEventParamsAdmin.getCategories().isEmpty()) {
+            specification = specification.and((root, query, cb) ->
+                    root.get("category").get("id").in(searchEventParamsAdmin.getCategories()));
         }
-        if (rangeEnd != null) {
-            specification = specification.and((root, query, criteriaBuilder) ->
-                    criteriaBuilder.lessThanOrEqualTo(root.get("eventDate"), rangeEnd));
+        if (searchEventParamsAdmin.getRangeStart() != null) {
+            specification = specification.and((root, query, cb) ->
+                    cb.greaterThanOrEqualTo(root.get("eventDate"), searchEventParamsAdmin.getRangeStart()));
         }
-        if (rangeStart != null) {
-            specification = specification.and((root, query, criteriaBuilder) ->
-                    criteriaBuilder.greaterThanOrEqualTo(root.get("eventDate"), rangeStart));
+        if (searchEventParamsAdmin.getRangeEnd() != null) {
+            specification = specification.and((root, query, cb) ->
+                    cb.lessThanOrEqualTo(root.get("eventDate"), searchEventParamsAdmin.getRangeEnd()));
         }
 
         Page<Event> events = eventRepository.findAll(specification, pageable);
         List<Event> eventList = events.getContent();
-
-        // 🛡 гарантируем, что будет хотя бы пустой список
         if (eventList == null || eventList.isEmpty()) {
             return List.of();
         }
 
-        List<EventFullDto> result = eventList.stream()
-                .map(EventMapper::toEventFullDto)
+        Map<Long, List<Request>> confirmedRequestsMap = getConfirmedRequestsCount(eventList);
+
+        List<String> uris = eventList.stream()
+                .map(event -> "/events/" + event.getId())
                 .collect(Collectors.toList());
 
-        Map<Long, List<Request>> confirmedRequestsCountMap = getConfirmedRequestsCount(eventList);
-        for (EventFullDto event : result) {
-            List<Request> requests = confirmedRequestsCountMap.getOrDefault(event.getId(), List.of());
-            event.setConfirmedRequests(requests.size());
-        }
+        LocalDateTime start = eventList.stream()
+                .map(Event::getCreatedDate)
+                .filter(Objects::nonNull)
+                .min(LocalDateTime::compareTo)
+                .orElse(LocalDateTime.now().minusYears(10));
 
-        return result;
+        LocalDateTime end = LocalDateTime.now();
+
+        ViewsStatsRequest statsRequest = ViewsStatsRequest.builder()
+                .uris(uris)
+                .start(start)
+                .end(end)
+                .unique(true)
+                .build();
+
+        List<ViewStats> viewStats = statsClient.getStats(statsRequest);
+
+        Map<Long, Long> viewsMap = viewStats.stream()
+                .collect(Collectors.toMap(
+                        s -> Long.parseLong(s.getUri().split("/")[2]),
+                        ViewStats::getHits
+                ));
+
+        return eventList.stream()
+                .map(event -> EventMapper.toEventFullDtoForAdmin(
+                        event,
+                        confirmedRequestsMap.getOrDefault(event.getId(), List.of()).size(),
+                        viewsMap.getOrDefault(event.getId(), 0L)
+                ))
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -134,6 +151,7 @@ public class EventServiceImpl implements EventService {
         if (gotAction != null) {
             if (EventAdminState.PUBLISH_EVENT.equals(gotAction)) {
                 eventForUpdate.setEventStatus(EventStatus.PUBLISHED);
+                eventForUpdate.setPublishedOn(LocalDateTime.now());
                 hasChanges = true;
             } else if (EventAdminState.REJECT_EVENT.equals(gotAction)) {
                 eventForUpdate.setEventStatus(EventStatus.CANCELED);
@@ -196,7 +214,8 @@ public class EventServiceImpl implements EventService {
         if (!userRepository.existsById(userId)) {
             throw new NotFoundException("Пользователь с id= " + userId + " не найден");
         }
-        PageRequest pageRequest = PageRequest.of(from / size, size, org.springframework.data.domain.Sort.by(Sort.Direction.ASC, "id"));
+        PageRequest pageRequest = PageRequest.of(from / size, size,
+                org.springframework.data.domain.Sort.by(Sort.Direction.ASC, "id"));
         return eventRepository.findAll(pageRequest).getContent()
                 .stream().map(EventMapper::toEventShortDto).collect(Collectors.toList());
     }
@@ -231,7 +250,6 @@ public class EventServiceImpl implements EventService {
         return eventFullDto;
     }
 
-
     @Override
     public List<ParticipationRequestDto> getAllParticipationRequestsFromEventByOwner(Long userId, Long eventId) {
         checkUser(userId);
@@ -241,7 +259,8 @@ public class EventServiceImpl implements EventService {
     }
 
     @Override
-    public EventRequestStatusUpdateResult updateStatusRequest(Long userId, Long eventId, EventRequestStatusUpdateRequest inputUpdate) {
+    public EventRequestStatusUpdateResult updateStatusRequest(Long userId, Long eventId,
+                                                              EventRequestStatusUpdateRequest inputUpdate) {
         checkUser(userId);
         Event event = checkEvenByInitiatorAndEventId(userId, eventId);
 
@@ -308,7 +327,8 @@ public class EventServiceImpl implements EventService {
 
         addStatsClient(request);
 
-        Pageable pageable = PageRequest.of(searchEventParams.getFrom() / searchEventParams.getSize(), searchEventParams.getSize());
+        Pageable pageable = PageRequest.of(searchEventParams.getFrom() / searchEventParams.getSize(),
+                searchEventParams.getSize());
 
         Specification<Event> specification = Specification.where(null);
         LocalDateTime now = LocalDateTime.now();

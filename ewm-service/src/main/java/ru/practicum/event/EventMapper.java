@@ -38,12 +38,12 @@ public class EventMapper {
                 .location(LocationMapper.toLocationDto(event.getLocation()))
                 .paid(event.isPaid())
                 .participantLimit(event.getParticipantLimit())
-                .publishedOn(event.getPublisherDate())
+                .publishedOn(event.getPublishedOn())
                 .requestModeration(event.isRequestModeration())
                 .state(event.getEventStatus())
                 .title(event.getTitle())
                 .confirmedRequests(0)  // временное значение, перезапишется позже
-                .views(0L)             // тоже будет перезаписано, если используется StatsClient
+                .views(0L)             // тоже будет перезаписано
                 .build();
     }
 
@@ -56,6 +56,27 @@ public class EventMapper {
                 .initiator(UserMapper.toUserShortDto(event.getInitiator()))
                 .paid(event.isPaid())
                 .title(event.getTitle())
+                .build();
+    }
+
+    public EventFullDtoForAdmin toEventFullDtoForAdmin(Event event, int confirmedRequests, long views) {
+        return EventFullDtoForAdmin.builder()
+                .id(event.getId())
+                .annotation(event.getAnnotation())
+                .category(CategoryMapper.toCategoryDto(event.getCategory()))
+                .createdOn(event.getCreatedDate())
+                .description(event.getDescription())
+                .eventDate(event.getEventDate())
+                .initiator(UserMapper.toUserShortDto(event.getInitiator()))
+                .location(LocationMapper.toLocationDto(event.getLocation()))
+                .paid(event.isPaid())
+                .participantLimit(event.getParticipantLimit())
+                .publishedOn(event.getPublishedOn())
+                .requestModeration(event.isRequestModeration())
+                .state(event.getEventStatus())
+                .title(event.getTitle())
+                .confirmedRequests(confirmedRequests)
+                .views(views)
                 .build();
     }
 

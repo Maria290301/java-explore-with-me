@@ -9,6 +9,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.event.EventService;
 import ru.practicum.event.dto.EventFullDto;
+import ru.practicum.event.dto.EventFullDtoForAdmin;
 import ru.practicum.event.dto.SearchEventParamsAdmin;
 import ru.practicum.event.dto.UpdateEventAdminRequest;
 import java.util.List;
@@ -22,10 +23,10 @@ public class AdminEventController {
     private final EventService eventService;
 
     @GetMapping
-    public ResponseEntity<List<EventFullDto>> searchEvents(
+    public ResponseEntity<List<EventFullDtoForAdmin>> searchEvents(
             @Valid SearchEventParamsAdmin params) {
         log.info("GET запрос на получение списка событий");
-        List<EventFullDto> list = eventService.getAllEventFromAdmin(params);
+        List<EventFullDtoForAdmin> list = eventService.getAllEventFromAdmin(params);
         return ResponseEntity.ok(list != null ? list : List.of());
     }
 

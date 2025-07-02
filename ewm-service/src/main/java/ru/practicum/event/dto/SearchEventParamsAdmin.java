@@ -1,11 +1,13 @@
 package ru.practicum.event.dto;
 
-import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import lombok.*;
+
 import java.time.LocalDateTime;
 import java.util.List;
+
+import org.springframework.format.annotation.DateTimeFormat;
 
 @Getter
 @Setter
@@ -16,12 +18,13 @@ public class SearchEventParamsAdmin {
     private List<Long> users;
     private List<String> states;
     private List<Long> categories;
-    @JsonFormat
-            (shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
+
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime rangeStart;
-    @JsonFormat
-            (shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
+
+    @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime rangeEnd;
+
     @Builder.Default
     @PositiveOrZero
     private Integer from = 0;
@@ -29,5 +32,4 @@ public class SearchEventParamsAdmin {
     @Builder.Default
     @Positive
     private Integer size = 10;
-
 }

@@ -229,7 +229,6 @@
             </activation>
             <build>
                 <plugins>
-                    <!-- Checkstyle Plugin -->
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-checkstyle-plugin</artifactId>
@@ -252,16 +251,15 @@
                             <dependency>
                                 <groupId>com.puppycrawl.tools</groupId>
                                 <artifactId>checkstyle</artifactId>
-                                <version>10.12.3</version> <!-- Совместима с JDK 21 -->
+                                <version>10.12.3</version>
                             </dependency>
                         </dependencies>
                     </plugin>
 
-                    <!-- SpotBugs Plugin -->
                     <plugin>
                         <groupId>com.github.spotbugs</groupId>
                         <artifactId>spotbugs-maven-plugin</artifactId>
-                        <version>4.8.3.0</version> <!-- Совместима с JDK 21 -->
+                        <version>4.8.3.0</version>
                         <configuration>
                             <effort>Max</effort>
                             <threshold>High</threshold>
