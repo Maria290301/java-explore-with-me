@@ -17,6 +17,8 @@ import ru.practicum.ViewStats;
 import ru.practicum.ViewsStatsRequest;
 import ru.practicum.category.Category;
 import ru.practicum.category.CategoryRepository;
+import ru.practicum.comment.CommentRepository;
+import ru.practicum.comment.dto.CountCommentsByEventDto;
 import ru.practicum.event.dto.*;
 import ru.practicum.exception.ConflictException;
 import ru.practicum.exception.NotFoundException;
@@ -47,6 +49,7 @@ public class EventServiceImpl implements EventService {
     private final RequestRepository requestRepository;
     private final LocationRepository locationRepository;
     private final ObjectMapper objectMapper;
+    private final CommentRepository commentRepository;
 
 
     @Value("${server.application.name:ewm-service}")
@@ -214,10 +217,32 @@ public class EventServiceImpl implements EventService {
         if (!userRepository.existsById(userId)) {
             throw new NotFoundException("Пользователь с id= " + userId + " не найден");
         }
+
         PageRequest pageRequest = PageRequest.of(from / size, size,
                 org.springframework.data.domain.Sort.by(Sort.Direction.ASC, "id"));
-        return eventRepository.findAll(pageRequest).getContent()
-                .stream().map(EventMapper::toEventShortDto).collect(Collectors.toList());
+
+        List<Event> events = eventRepository.findAll(pageRequest).getContent();
+
+        List<EventShortDto> result = events.stream()
+                .map(EventMapper::toEventShortDto)
+                .collect(Collectors.toList());
+
+        Map<Long, Long> viewsMap = getViewsAllEvents(events);
+
+        List<CountCommentsByEventDto> commentsCountMap = commentRepository.countCommentByEvent(
+                events.stream().map(Event::getId).collect(Collectors.toList()));
+        Map<Long, Long> commentsCountToEventIdMap = commentsCountMap.stream().collect(Collectors.toMap(
+                CountCommentsByEventDto::getEventId, CountCommentsByEventDto::getCountComments));
+
+        for (EventShortDto event : result) {
+            Long views = viewsMap.getOrDefault(event.getId(), 0L);
+            event.setViews(views);
+
+            Long comments = commentsCountToEventIdMap.getOrDefault(event.getId(), 0L);
+            event.setComments(comments);
+        }
+
+        return result;
     }
 
     @Override
@@ -369,9 +394,17 @@ public class EventServiceImpl implements EventService {
                 .stream().map(EventMapper::toEventShortDto).collect(Collectors.toList());
         Map<Long, Long> viewStatsMap = getViewsAllEvents(resultEvents);
 
+        List<CountCommentsByEventDto> commentsCountMap = commentRepository.countCommentByEvent(
+                resultEvents.stream().map(Event::getId).collect(Collectors.toList()));
+        Map<Long, Long> commentsCountToEventIdMap = commentsCountMap.stream().collect(Collectors.toMap(
+                CountCommentsByEventDto::getEventId, CountCommentsByEventDto::getCountComments));
+
         for (EventShortDto event : result) {
             Long viewsFromMap = viewStatsMap.getOrDefault(event.getId(), 0L);
             event.setViews(viewsFromMap);
+
+            Long commentCountFromMap = commentsCountToEventIdMap.getOrDefault(event.getId(), 0L);
+            event.setComments(commentCountFromMap);
         }
 
         return result;
